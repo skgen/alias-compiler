@@ -1,0 +1,23 @@
+{
+  "name": "@patriarche/alias-compiler",
+  "license": "MIT",
+  "version": "0.0.0",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "review": "yarn review:eslint",
+    "review:eslint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "link:local": "yarn build && rm -rf .link && mkdir .link && cp -r dist .link/dist && cp package.json .link"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "fs-extra": "^11.1.1"
+  },
+  "devDependencies": {
+    "@patriarche/eslint-config-base": "^1.0.1",
+    "eslint": "^8.0.0"
+  }
+}

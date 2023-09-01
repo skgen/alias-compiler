@@ -1,0 +1,92 @@
+image: docker:stable
+
+stages:
+  - review
+  - build
+  - publish
+
+review:eslint:
+  image: registry.gitlab.com/patriarche/devops/controller/node-build:latest
+  stage: review
+  only:
+    refs:
+        - tags
+        - merge_requests
+  script:
+    - >
+      yarn install --production=false &&
+      yarn review:eslint
+
+build:
+  image: registry.gitlab.com/patriarche/devops/controller/node-build:latest
+  stage: build
+  only:
+    refs:
+      - tags
+  script:
+    - >
+      yarn install --production=false &&
+      yarn build
+    - |
+      echo "Code build : success"
+  artifacts:
+    expire_in: "1 days"
+    paths:
+      - "dist"
+
+publish:version:
+  image: registry.gitlab.com/patriarche/devops/controller/node-build:latest
+  stage: publish
+  only:
+    refs:
+      - tags
+  script:
+    - NPM_PACKAGE_NAME=$(node -p "require('./package.json').name")
+    - NPM_PACKAGE_VERSION=$(node -p "require('./package.json').version")
+    # Check package.json matches git tag
+    - |
+      if [[ "v$NPM_PACKAGE_VERSION" != $CI_COMMIT_REF_NAME ]]; then
+        echo "Version of package.json (v$NPM_PACKAGE_VERSION) & tag ($CI_COMMIT_REF_NAME) don't match."
+        exit 1
+      fi
+
+publish:npm:
+  image: registry.gitlab.com/patriarche/devops/controller/node-build:latest
+  stage: publish
+  only:
+    refs:
+      - tags
+  script:
+    # Enhance .npmrc for publishing
+    - |
+      if [[ ! -f .npmrc ]]; then
+        echo "No .npmrc found, creating one for the job."
+      else
+        echo "Adding credentials to existing .npmrc."
+        echo "" >> .npmrc
+      fi
+      {
+        echo "@${CI_PROJECT_ROOT_NAMESPACE}:registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/"
+        echo "${CI_API_V4_URL#http*:}/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=\${CI_JOB_TOKEN}"
+      } >> .npmrc
+      echo "Final .npmrc :";
+      cat .npmrc
+    - NPM_PACKAGE_NAME=$(node -p "require('./package.json').name")
+    - NPM_PACKAGE_VERSION=$(node -p "require('./package.json').version")
+    # Validate that the package name is properly scoped to the project's root namespace.
+    # For more information, see https://docs.gitlab.com/ee/user/packages/npm_registry/#package-naming-convention
+    - |
+      if [[ ! $NPM_PACKAGE_NAME =~ ^@$CI_PROJECT_ROOT_NAMESPACE/ ]]; then
+        echo "Invalid package scope! Packages must be scoped in the root namespace of the project, e.g. \"@${CI_PROJECT_ROOT_NAMESPACE}/${CI_PROJECT_NAME}\""
+        echo 'For more information, see https://docs.gitlab.com/ee/user/packages/npm_registry/#package-naming-convention'
+        exit 1
+      fi
+    # Compare the version in package.json to all published versions.
+    # If the package.json version has not yet been published, run `npm publish`.
+    - |
+      if [[ "$(npm view ${NPM_PACKAGE_NAME} versions)" != *"'${NPM_PACKAGE_VERSION}'"* ]]; then
+        npm publish
+        echo "Successfully published version ${NPM_PACKAGE_VERSION} of ${NPM_PACKAGE_NAME} to GitLab's NPM registry: ${CI_PROJECT_URL}/-/packages"
+      else
+        echo "Version ${NPM_PACKAGE_VERSION} of ${NPM_PACKAGE_NAME} has already been published, so no new version has been published."
+      fi

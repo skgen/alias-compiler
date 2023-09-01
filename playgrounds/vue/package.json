@@ -1,0 +1,20 @@
+{
+  "name": "alias-compiler-playground",
+  "license": "MIT",
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "nodemon scripts/build.js --watch './src/*' -e ts,vue",
+    "build": "node scripts/build.js",
+    "link:local": "rm -rf node_modules/@patriarche/alias-compiler && yarn --check-files"
+  },
+  "devDependencies": {
+    "@patriarche/alias-compiler": "file:../../.link",
+    "@patriarche/eslint-config-vue": "^1.1.0",
+    "@tsconfig/node18": "^2.0.1",
+    "@types/jsdom": "^21.1.1",
+    "@vue/tsconfig": "^0.4.0",
+    "eslint": "^8.0.0",
+    "nodemon": "^3.0.1",
+    "typescript": "~5.0.4"
+  }
+}
